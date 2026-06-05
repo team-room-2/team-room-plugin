@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "team-room",
+  "description": "Team Room — live agent collaboration. See your teammates' in-flight Claude Code work before it becomes a commit.",
+  "owner": { "name": "David Lee" },
+  "plugins": [
+    {
+      "name": "team-room",
+      "source": "./team-room",
+      "description": "See your team's agents at work, live. Auto-adds the hosted connector, streams your Claude Code activity into a shared room (CLI + desktop), and adds /team-room:connect.",
+      "category": "collaboration",
+      "keywords": ["collaboration", "live", "mcp", "team", "activity"]
+    }
+  ]
+}

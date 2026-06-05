@@ -1,0 +1,9 @@
+{
+  "name": "team-room",
+  "version": "0.1.0",
+  "description": "See your team's agents at work, live — stream your Claude Code activity into a shared room before it becomes a commit.",
+  "author": { "name": "David Lee" },
+  "homepage": "https://team-room.vercel.app",
+  "keywords": ["collaboration", "mcp", "live", "team", "activity"],
+  "commands": ["./commands/connect.md", "./commands/disconnect.md"]
+}
