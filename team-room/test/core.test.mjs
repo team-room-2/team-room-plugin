@@ -47,6 +47,14 @@ test('parseTranscriptRow: mixed text + tool_use → both, in order', () => {
   assert.deepEqual(parseTranscriptRow({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'Editing' }, { type: 'tool_use', name: 'Write', input: { file_path: 'a.ts' } }] } }),
     [{ kind: 'agent_message', summary: 'Editing' }, { kind: 'file_edit', targetPath: 'a.ts', summary: '✎ Write a.ts' }]);
 });
+test('parseTranscriptRow: assistant STRING content → agent_message', () => {
+  assert.deepEqual(parseTranscriptRow({ type: 'assistant', message: { role: 'assistant', content: 'Done — shipped it.' } }),
+    [{ kind: 'agent_message', summary: 'Done — shipped it.' }]);
+});
+test('parseTranscriptRow: keeps a real prompt that starts with "<"', () => {
+  assert.deepEqual(parseTranscriptRow({ type: 'user', message: { role: 'user', content: '<div> how do I center this?' } }),
+    [{ kind: 'prompt', summary: '<div> how do I center this?' }]);
+});
 
 // ── last assistant text (CLI Stop hook) ────────────────────────────────────────────────
 test('lastAssistantText: returns the final assistant text', () => {

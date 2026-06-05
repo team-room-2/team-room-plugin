@@ -23,12 +23,19 @@ process.stdin.on('data', (chunk) => {
     if (line) handle(line);
   }
 });
+// Exit cleanly when the host closes stdin or signals us, so a watcher never orphans the session.
+process.stdin.on('end', () => process.exit(0));
+process.on('SIGTERM', () => process.exit(0));
+process.on('SIGINT', () => process.exit(0));
+
 const send = (msg) => process.stdout.write(JSON.stringify(msg) + '\n');
 const reply = (id, result) => send({ jsonrpc: '2.0', id, result });
 const fail = (id, code, message) => send({ jsonrpc: '2.0', id, error: { code, message } });
 
 function statusText() {
+  if (state.lastError) return `⚠ ${state.lastError}`;
   if (!state.marker) return `Idle — not connected. Run /team-room:connect <room> to start streaming. (transcript: ${state.file || 'resolving'})`;
+  if (state.standby) return `Standing down — the CLI hooks are streaming this session (no double-capture).`;
   return `Streaming to the room · ${state.posted} activities sent · transcript: ${state.file || 'resolving'}`;
 }
 

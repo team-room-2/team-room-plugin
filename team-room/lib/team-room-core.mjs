@@ -73,6 +73,10 @@ export function mapHookEvent(ev) {
 function textOf(blocks) {
   return blocks.filter((b) => b && b.type === 'text').map((b) => b.text || '').join('\n').trim();
 }
+// Tool-injected/synthetic user turns are wrapped in tags like <command-name>… or
+// <local-command-stdout>… — skip those, but keep real prompts (even ones that start with '<',
+// e.g. someone pasting "<div>"). Match the known synthetic markers, not any leading '<'.
+const SYNTHETIC = /^<(command-name|command-message|command-args|local-command-stdout|local-command-stderr|user-prompt-submit-hook|system-reminder)\b/;
 export function parseTranscriptRow(row) {
   const out = [];
   const m = row && row.message;
@@ -86,21 +90,25 @@ export function parseTranscriptRow(row) {
       text = textOf(c);
     }
     text = (text || '').trim();
-    // skip synthetic <...>-wrapped system/command prompts; keep real user text
-    if (text && !text.startsWith('<')) out.push({ kind: 'prompt', summary: text.slice(0, MAX) });
-  } else if (row.type === 'assistant' && m.role === 'assistant' && Array.isArray(c)) {
-    for (const b of c) {
-      if (!b) continue;
-      if (b.type === 'tool_use') {
-        const fp = typeof b.input?.file_path === 'string' ? b.input.file_path : undefined;
-        if (EDIT_TOOLS.has(b.name) && fp) out.push({ kind: 'file_edit', targetPath: fp, summary: `✎ ${b.name} ${fp}` });
-        else if (b.name === 'Read' && fp) out.push({ kind: 'file_read', targetPath: fp, summary: `○ Read ${fp}` });
-        else if (b.name) out.push({ kind: 'tool_use', summary: `• ${b.name}` });
-      } else if (b.type === 'text') {
-        const t = (b.text || '').trim();
-        if (t) out.push({ kind: 'agent_message', summary: t.slice(0, MAX) });
+    if (text && !SYNTHETIC.test(text)) out.push({ kind: 'prompt', summary: text.slice(0, MAX) });
+  } else if (row.type === 'assistant' && m.role === 'assistant') {
+    if (typeof c === 'string') {
+      const t = c.trim();
+      if (t) out.push({ kind: 'agent_message', summary: t.slice(0, MAX) });
+    } else if (Array.isArray(c)) {
+      for (const b of c) {
+        if (!b) continue;
+        if (b.type === 'tool_use') {
+          const fp = typeof b.input?.file_path === 'string' ? b.input.file_path : undefined;
+          if (EDIT_TOOLS.has(b.name) && fp) out.push({ kind: 'file_edit', targetPath: fp, summary: `✎ ${b.name} ${fp}` });
+          else if (b.name === 'Read' && fp) out.push({ kind: 'file_read', targetPath: fp, summary: `○ Read ${fp}` });
+          else if (b.name) out.push({ kind: 'tool_use', summary: `• ${b.name}` });
+        } else if (b.type === 'text') {
+          const t = (b.text || '').trim();
+          if (t) out.push({ kind: 'agent_message', summary: t.slice(0, MAX) });
+        }
+        // thinking blocks → skipped (internal reasoning, not for the room)
       }
-      // thinking blocks → skipped (internal reasoning, not for the room)
     }
   }
   return out;
