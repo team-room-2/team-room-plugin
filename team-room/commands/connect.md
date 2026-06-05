@@ -15,11 +15,11 @@ Do exactly this, in order:
    - `label`: a short human label for this session — the current task or the repo name
    - `visibility`: `restricted` if `--private`/`--restricted` was given, otherwise `public`
 
-2. The tool returns `{ session, writeToken }` (`session` has `id` and `roomId`). Persist a **per-session** marker so capture authenticates THIS session only — the filename uses `$CLAUDE_CODE_SESSION_ID`, so each session maps to its own room lane. Run this Bash, substituting the real values from the tool result:
+2. The tool result includes a ready-to-write **`marker`** object. Persist it as this session's marker so capture authenticates THIS session only — the filename uses `$CLAUDE_CODE_SESSION_ID`, so each session maps to its own room lane. Write the `marker` from the result verbatim:
 
    ```bash
    mkdir -p ~/.team-room/sessions && cat > ~/.team-room/sessions/"$CLAUDE_CODE_SESSION_ID".json <<'JSON'
-   {"sessionId":"<session.id>","roomId":"<session.roomId>","token":"<writeToken>","apiUrl":"https://team-room.vercel.app","room":"<room-name>"}
+   <the marker object from the tool result, as one line of JSON>
    JSON
    ```
    The marker lives outside the repo, so the token is never committed — **no `.gitignore` change needed.**
