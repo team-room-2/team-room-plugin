@@ -1,12 +1,15 @@
 {
-  "description": "Team Room — stream Claude Code activity (prompts, file actions, replies) into the shared room while connected, and inject incoming messages. No-op until you run /team-room:connect (no local marker → nothing is sent).",
+  "description": "Team Room — stream Claude Code activity (prompts, file actions, replies) into the shared room while connected, inject incoming messages, and flag file collisions. No-op until you run /team-room:connect (no local marker → nothing is sent).",
   "hooks": {
     "SessionStart": [{ "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run-inbox.sh\"" }] }],
     "UserPromptSubmit": [
       { "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\"" }] },
       { "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run-inbox.sh\"" }] }
     ],
-    "PreToolUse": [{ "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\"" }] }],
+    "PreToolUse": [
+      { "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\"" }] },
+      { "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run-declare.sh\"" }] }
+    ],
     "PostToolUse": [{ "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\"" }] }],
     "Stop": [{ "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\"" }] }]
   }

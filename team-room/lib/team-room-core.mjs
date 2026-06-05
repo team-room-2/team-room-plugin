@@ -136,6 +136,13 @@ export function formatInbox(messages) {
   return `📨 Team Room — ${messages.length} new message${messages.length > 1 ? 's' : ''} from your teammate(s):\n${lines}`;
 }
 
+// PreToolUse declare-intent (Layer 2): pull the file path from an edit tool event.
+export function editTargetPath(event) {
+  if (!event || !EDIT_TOOLS.has(event.tool_name)) return null;
+  const fp = event.tool_input && event.tool_input.file_path;
+  return typeof fp === 'string' ? fp : null;
+}
+
 // ── last assistant text from a transcript (CLI Stop hook; mirrors hooks/extract-reply.ts) ─
 export function lastAssistantText(jsonl) {
   const lines = jsonl.split('\n').map((l) => l.trim()).filter(Boolean);
