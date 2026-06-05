@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// PreToolUse (Layer 2). Before an edit, declare intent on the file via POST /api/target with the
+// PreToolUse (Layer 2). Before an edit, declare intent on the file via POST /api/intent with the
 // session write-token, which detects collisions server-side. If a collision is reported, surface a
 // warning to the agent's context (non-blocking in v1 — Layer 3 adds the yield). No marker → silent.
 import { readMarker, editTargetPath } from '../lib/team-room-core.mjs';
@@ -18,7 +18,7 @@ async function main() {
   if (!marker || !marker.apiUrl || !marker.token) return;
   let collision = null;
   try {
-    const res = await fetch(`${marker.apiUrl}/api/target`, {
+    const res = await fetch(`${marker.apiUrl}/api/intent`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${marker.token}` },
       body: JSON.stringify({ path }),
