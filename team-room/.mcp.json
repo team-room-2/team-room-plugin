@@ -4,10 +4,6 @@
       "type": "http",
       "url": "https://team-room.vercel.app/api/mcp",
       "note": "Team Room — hosted connector. Tools: connect_room, whoami, get_recent_activity, set_current_target, leave_room. On first use you'll be prompted to sign in via WorkOS/AuthKit."
-    },
-    "team-room-capture": {
-      "command": "sh",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/watcher/run-watcher.sh"]
     }
   }
 }

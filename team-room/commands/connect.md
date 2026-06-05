@@ -1,12 +1,12 @@
 ---
 description: Connect this Claude Code session to a Team Room so your activity streams live.
 argument-hint: <room-name> [--private]
-allowed-tools: Bash, Write
+allowed-tools: Bash
 ---
 
 # Connect to a Team Room
 
-Parse `$ARGUMENTS`: the **room name** is the first word (if none given, use `checkout-app`); if the arguments contain `--private` or `--restricted`, the session is restricted (viewable only by its named audience), otherwise it's public within the room. Connect so this agent's activity streams into the live room.
+Parse `$ARGUMENTS`: the **room name** is the first word (if none given, use `checkout-app`); if the arguments contain `--private` or `--restricted`, the session is restricted (viewable only by its named audience), otherwise it's public within the room.
 
 Do exactly this, in order:
 
@@ -15,16 +15,15 @@ Do exactly this, in order:
    - `label`: a short human label for this session — the current task or the repo name
    - `visibility`: `restricted` if `--private`/`--restricted` was given, otherwise `public`
 
-2. The tool returns `{ session, writeToken }`, where `session` has `id` and `roomId`. Persist the connection marker so capture can authenticate. Use the **Write** tool to create `.team-room/connection.json` in the current working directory, with EXACTLY this shape (substitute the real values):
+2. The tool returns `{ session, writeToken }` (`session` has `id` and `roomId`). Persist a **per-session** marker so capture authenticates THIS session only — the filename uses `$CLAUDE_CODE_SESSION_ID`, so each session maps to its own room lane. Run this Bash, substituting the real values from the tool result:
 
-   ```json
-   { "sessionId": "<session.id>", "roomId": "<session.roomId>", "token": "<writeToken>", "apiUrl": "https://team-room.vercel.app", "room": "<room-name>" }
+   ```bash
+   mkdir -p ~/.team-room/sessions && cat > ~/.team-room/sessions/"$CLAUDE_CODE_SESSION_ID".json <<'JSON'
+   {"sessionId":"<session.id>","roomId":"<session.roomId>","token":"<writeToken>","apiUrl":"https://team-room.vercel.app","room":"<room-name>"}
+   JSON
    ```
+   The marker lives outside the repo, so the token is never committed — **no `.gitignore` change needed.**
 
-3. Make sure the marker is gitignored (it holds a token). Run:
-   `grep -qsxF '.team-room/' .gitignore || printf '\n.team-room/\n' >> .gitignore`
+3. Confirm to the user that their prompts, file edits, and replies now stream to the room, and give the live link: `https://team-room.vercel.app/room/<session.roomId>`
 
-4. Confirm to the user: their prompts, file edits, and replies are now streaming to the room, and give them the live view link:
-   `https://team-room.vercel.app/room/<session.roomId>`
-
-**Never print the write-token to the user** — it is a secret that authorizes appending activity to this session.
+**Never print the write-token to the user** — it authorizes appending activity to this session.

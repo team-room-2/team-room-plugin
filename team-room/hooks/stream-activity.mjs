@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// CLI capture. Claude Code pipes the hook event JSON on stdin; we map it to a room activity
-// and POST with the session-scoped write-token from the local .team-room marker. We also
-// touch the hooks heartbeat on every event so the desktop watcher knows hooks are live here
-// and stands down. If there's no marker (the user hasn't run /connect) we stay silent.
+// CLI capture. Claude Code pipes the hook event JSON on stdin (it carries session_id); we map it
+// to a room activity and POST with the write-token from THIS session's marker
+// (~/.team-room/sessions/<session_id>.json). We also touch the per-session heartbeat each event
+// so the desktop daemon knows this session's hooks are live and stands down. No marker → silent.
 import { readFileSync } from 'node:fs';
 import { readMarker, postActivity, mapHookEvent, lastAssistantText, touchHeartbeat } from '../lib/team-room-core.mjs';
 
@@ -24,12 +24,13 @@ function toActivity(event) {
 async function main() {
   let event;
   try { event = JSON.parse((await readStdin()) || '{}'); } catch { return; }
-  const dir = process.env.TEAM_ROOM_DIR || process.cwd();
-  touchHeartbeat(dir); // signal "hooks are live here" so the desktop watcher won't double-post
+  const sid = event.session_id || process.env.CLAUDE_CODE_SESSION_ID;
+  if (!sid) return;
+  touchHeartbeat(sid); // this session's hooks are live → the desktop daemon stands down for it
   const activity = toActivity(event);
   if (!activity) return;
-  const marker = readMarker(dir);
-  if (!marker) return; // not connected → private (default)
+  const marker = readMarker(sid);
+  if (!marker) return; // this session isn't connected → private (default)
   await postActivity(marker, activity);
 }
 main();

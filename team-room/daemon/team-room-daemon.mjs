@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // Standalone background capture for the Claude Code DESKTOP app — which runs no hooks and no
-// local MCP servers, so it can't host the per-session watcher the way the CLI does. This daemon
-// (run under launchd) scans ~/.claude/projects for ACTIVE sessions; for any whose project cwd has
-// a .team-room/connection.json marker, it tails the transcript and streams activity to the room.
-// On the CLI, where the plugin's hooks already stream instantly, it stands down per-project via
-// the hook heartbeat — so the daemon and the hooks never double-post. Pure Node, no deps; reuses
-// the plugin's capture core (same parser + POST as the hooks/watcher).
-import { readFileSync, statSync, openSync, readSync, closeSync, fstatSync } from 'node:fs';
+// local MCP servers. This daemon (run under launchd) scans ~/.claude/projects for ACTIVE
+// sessions; for any session that has a per-session marker (~/.team-room/sessions/<session-id>.json,
+// written by /connect — the transcript filename IS the session id), it tails the transcript and
+// streams activity to THAT session's room lane. On the CLI, where the plugin's hooks already
+// stream, it stands down per-session via the hook heartbeat — so the daemon and the hooks never
+// double-post. Pure Node, no deps; reuses the plugin's capture core.
+import { statSync, openSync, readSync, closeSync, fstatSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -16,19 +16,7 @@ const PROJECTS = join(homedir(), '.claude', 'projects');
 const POLL_MS = Number(process.env.TEAM_ROOM_POLL_MS || 1500);
 const ACTIVE_MS = Number(process.env.TEAM_ROOM_ACTIVE_MS || 10 * 60 * 1000); // ignore stale transcripts
 
-const tracked = new Map(); // transcriptFile -> { cwd, offset, seen:Set }
-
-// Claude Code records the session's cwd on assistant/attachment lines — read it so we can find
-// that project's .team-room marker (the marker lives in the project dir, not under ~/.claude).
-function cwdOf(file) {
-  try {
-    for (const line of readFileSync(file, 'utf8').split('\n')) {
-      const s = line.trim(); if (!s) continue;
-      try { const r = JSON.parse(s); if (typeof r.cwd === 'string') return r.cwd; } catch { /* */ }
-    }
-  } catch { /* */ }
-  return null;
-}
+const tracked = new Map(); // transcriptFile -> { offset, seen:Set }
 
 // Read only the bytes after offset, up to the last complete line (partial-line-safe).
 function readNew(file, st) {
@@ -53,18 +41,18 @@ async function tick() {
     for (const f of files) {
       if (!f.endsWith('.jsonl')) continue;
       const file = join(PROJECTS, dir, f);
+      const sessionId = f.slice(0, -'.jsonl'.length);       // transcript filename === Claude Code session id
       let mtime; try { mtime = statSync(file).mtimeMs; } catch { continue; }
-      if (Date.now() - mtime > ACTIVE_MS) continue;        // inactive session — skip
+      if (Date.now() - mtime > ACTIVE_MS) continue;         // inactive session — skip
+      const marker = readMarker(sessionId);                 // per-session marker (re-read each tick)
+      if (!marker) continue;                                // this session isn't connected
+      if (heartbeatFresh(sessionId)) continue;              // CLI hooks own this session — stand down
       let st = tracked.get(file);
-      if (!st) {                                           // first sight: cache cwd, start at EOF
+      if (!st) {                                            // first sight after connect: start at EOF
         let offset = 0; try { offset = statSync(file).size; } catch { /* */ }
-        tracked.set(file, { cwd: cwdOf(file), offset, seen: new Set() });
+        tracked.set(file, { offset, seen: new Set() });
         continue;
       }
-      if (!st.cwd) { st.cwd = cwdOf(file); if (!st.cwd) continue; }
-      const marker = readMarker(st.cwd);                   // re-read each tick (connect/disconnect)
-      if (!marker) continue;                               // project not connected
-      if (heartbeatFresh(st.cwd)) continue;                // CLI hooks own this project — stand down
       const chunk = readNew(file, st);
       if (!chunk) continue;
       for (const line of chunk.split('\n')) {

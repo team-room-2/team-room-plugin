@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mapHookEvent, parseTranscriptRow, lastAssistantText } from '../lib/team-room-core.mjs';
+import { mapHookEvent, parseTranscriptRow, lastAssistantText, markerPath, readMarker, touchHeartbeat, heartbeatFresh } from '../lib/team-room-core.mjs';
+import { writeFileSync, rmSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 // ── hook-event mapping (CLI path) ──────────────────────────────────────────────────────
 test('mapHookEvent: PostToolUse Edit → file_edit (end)', () => {
@@ -64,4 +66,33 @@ test('lastAssistantText: returns the final assistant text', () => {
     JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'final answer' }] } }),
   ].join('\n');
   assert.equal(lastAssistantText(jsonl), 'final answer');
+});
+
+// ── per-session marker routing (the session-mixing fix) ────────────────────────────────
+test('markerPath: each session id maps to its own file under ~/.team-room/sessions', () => {
+  const a = markerPath('sess-A'), b = markerPath('sess-B');
+  assert.notEqual(a, b);                                   // two sessions never share a marker
+  assert.match(a, /\.team-room\/sessions\/sess-A\.json$/);
+  assert.match(b, /\.team-room\/sessions\/sess-B\.json$/);
+});
+test('readMarker: unknown session id → null (session not connected)', () => {
+  assert.equal(readMarker('__team_room_no_such_session__'), null);
+});
+test('readMarker: reads the marker for THIS session id only — no cross-talk', () => {
+  const idA = '__team_room_test_A__', idB = '__team_room_test_B__';
+  const pA = markerPath(idA), pB = markerPath(idB);
+  mkdirSync(dirname(pA), { recursive: true });
+  try {
+    writeFileSync(pA, JSON.stringify({ sessionId: 'room-session-A', room: 'alpha' }));
+    writeFileSync(pB, JSON.stringify({ sessionId: 'room-session-B', room: 'beta' }));
+    assert.equal(readMarker(idA).sessionId, 'room-session-A');
+    assert.equal(readMarker(idB).sessionId, 'room-session-B');
+  } finally { rmSync(pA, { force: true }); rmSync(pB, { force: true }); }
+});
+test('heartbeat: fresh only for the session whose heartbeat was touched', () => {
+  const id = '__team_room_test_hb__';
+  assert.equal(heartbeatFresh(id), false);                 // never touched
+  touchHeartbeat(id);
+  assert.equal(heartbeatFresh(id), true);                  // this session's hooks are live
+  assert.equal(heartbeatFresh('__team_room_test_hb_other__'), false); // per-session, no bleed
 });

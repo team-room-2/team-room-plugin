@@ -1,20 +1,25 @@
 // team-room-core.mjs — self-contained capture core for the Team Room plugin.
-// Shared by the CLI hook (hooks/stream-activity.mjs) and the desktop watcher
-// (watcher/watch-transcript.mjs). Zero dependencies beyond the Node stdlib; it talks
+// Shared by the CLI hook (hooks/stream-activity.mjs) and the desktop daemon
+// (daemon/team-room-daemon.mjs). Zero dependencies beyond the Node stdlib; it talks
 // only to the hosted Team Room API. Mirrors the app repo's hooks/ logic, ported to ESM.
 
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { createHash } from 'node:crypto';
+import { tmpdir, homedir } from 'node:os';
 
 const MAX = 500; // summary cap — matches the server's activityIngestSchema (.max(500))
 
-// ── marker (.team-room/connection.json), written by the /connect command ──────────────
-// Shape: { sessionId, token, apiUrl }  (token = the session-scoped write-token)
-export function readMarker(cwd) {
-  try { return JSON.parse(readFileSync(join(cwd, '.team-room', 'connection.json'), 'utf8')); }
-  catch { return null; }
+// ── per-session connection marker, written by /connect ────────────────────────────────
+// Keyed by the Claude Code session id (CLAUDE_CODE_SESSION_ID, which is also the transcript
+// filename), so each session maps to its OWN room session — no cross-session mixing when
+// several sessions share a project folder. Lives OUTSIDE any repo (~/.team-room/sessions/), so
+// the token is never at risk of being committed. Shape: { sessionId, roomId, token, apiUrl, room }
+// where `sessionId` is the ROOM session id used for activity and `token` is the write-token.
+export function markerPath(ccSessionId) {
+  return join(homedir(), '.team-room', 'sessions', `${ccSessionId}.json`);
+}
+export function readMarker(ccSessionId) {
+  try { return JSON.parse(readFileSync(markerPath(ccSessionId), 'utf8')); } catch { return null; }
 }
 
 // ── POST one activity to the hosted room with the write-token ─────────────────────────
@@ -30,19 +35,20 @@ export async function postActivity(marker, activity) {
   } catch { return false; }
 }
 
-// ── hooks heartbeat ───────────────────────────────────────────────────────────────────
-// The CLI hooks touch this (per project cwd) on every event. The desktop watcher checks it
-// and STANDS DOWN whenever it's fresh — so on the CLI, where hooks already stream instantly,
-// the watcher never double-posts. On the desktop app (no hooks) the heartbeat stays absent,
-// so the watcher captures. Lives in the temp dir, keyed by a hash of the project path.
-function heartbeatPath(cwd) {
-  return join(tmpdir(), `team-room-hb-${createHash('sha1').update(cwd).digest('hex').slice(0, 16)}`);
+// ── per-session heartbeat ─────────────────────────────────────────────────────────────
+// The CLI hooks touch this each event (keyed by the session id); the desktop daemon checks it
+// for that session and STANDS DOWN when fresh — so on the CLI (hooks already streaming) the
+// daemon never double-posts. On the desktop app (no hooks) it stays absent, so the daemon captures.
+function heartbeatPath(ccSessionId) {
+  return join(tmpdir(), `team-room-hb-${ccSessionId}`);
 }
-export function touchHeartbeat(cwd) {
-  try { writeFileSync(heartbeatPath(cwd), String(Date.now())); } catch { /* best-effort */ }
+export function touchHeartbeat(ccSessionId) {
+  if (!ccSessionId) return;
+  try { writeFileSync(heartbeatPath(ccSessionId), String(Date.now())); } catch { /* best-effort */ }
 }
-export function heartbeatFresh(cwd, maxAgeMs = 60000) {
-  try { return Date.now() - statSync(heartbeatPath(cwd)).mtimeMs < maxAgeMs; } catch { return false; }
+export function heartbeatFresh(ccSessionId, maxAgeMs = 60000) {
+  if (!ccSessionId) return false;
+  try { return Date.now() - statSync(heartbeatPath(ccSessionId)).mtimeMs < maxAgeMs; } catch { return false; }
 }
 
 // ── hook events → activity (CLI path; mirrors hooks/map-activity.ts) ───────────────────
