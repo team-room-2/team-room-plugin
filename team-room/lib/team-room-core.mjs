@@ -120,6 +120,29 @@ export function parseTranscriptRow(row) {
   return out;
 }
 
+// ── inbox (Layer 1): the CLI hook pulls unread for this session's member and injects it ──
+export async function fetchUnread(marker) {
+  if (!marker || !marker.apiUrl || !marker.token) return [];
+  try {
+    const res = await fetch(`${marker.apiUrl}/api/messages?unread=1`, { headers: { authorization: `Bearer ${marker.token}` } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.messages) ? data.messages : [];
+  } catch { return []; }
+}
+export function formatInbox(messages) {
+  if (!messages || messages.length === 0) return '';
+  const lines = messages.map((m) => `• ${m.from ?? 'teammate'}: ${m.body}`).join('\n');
+  return `📨 Team Room — ${messages.length} new message${messages.length > 1 ? 's' : ''} from your teammate(s):\n${lines}`;
+}
+
+// PreToolUse declare-intent (Layer 2): pull the file path from an edit tool event.
+export function editTargetPath(event) {
+  if (!event || !EDIT_TOOLS.has(event.tool_name)) return null;
+  const fp = event.tool_input && event.tool_input.file_path;
+  return typeof fp === 'string' ? fp : null;
+}
+
 // ── last assistant text from a transcript (CLI Stop hook; mirrors hooks/extract-reply.ts) ─
 export function lastAssistantText(jsonl) {
   const lines = jsonl.split('\n').map((l) => l.trim()).filter(Boolean);

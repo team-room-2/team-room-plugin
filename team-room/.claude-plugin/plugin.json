@@ -1,6 +1,6 @@
 {
   "name": "team-room",
-  "version": "0.2.1",
+  "version": "0.3.1",
   "description": "See your team's agents at work, live — stream your Claude Code activity into a shared room before it becomes a commit.",
   "author": { "name": "David Lee" },
   "homepage": "https://team-room.vercel.app",

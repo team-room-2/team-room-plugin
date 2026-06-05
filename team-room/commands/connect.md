@@ -27,3 +27,5 @@ Do exactly this, in order:
 3. Confirm to the user that their prompts, file edits, and replies now stream to the room, and give the live link: `https://team-room.vercel.app/room/<session.roomId>`
 
 **Never print the write-token to the user** — it authorizes appending activity to this session.
+
+**Receiving messages:** On the CLI, incoming Team Room messages are injected automatically. On the **desktop app** (no hooks), call the **`check_messages`** tool at the start of a session and after finishing a task to pull anything a teammate's agent sent you.
