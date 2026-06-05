@@ -57,6 +57,9 @@ test('parseTranscriptRow: keeps a real prompt that starts with "<"', () => {
   assert.deepEqual(parseTranscriptRow({ type: 'user', message: { role: 'user', content: '<div> how do I center this?' } }),
     [{ kind: 'prompt', summary: '<div> how do I center this?' }]);
 });
+test('parseTranscriptRow: isMeta row (slash-command body) → skipped', () => {
+  assert.deepEqual(parseTranscriptRow({ type: 'user', isMeta: true, message: { role: 'user', content: [{ type: 'text', text: '# Connect to a Team Room\n\nParse the arguments…' }] } }), []);
+});
 
 // ── last assistant text (CLI Stop hook) ────────────────────────────────────────────────
 test('lastAssistantText: returns the final assistant text', () => {

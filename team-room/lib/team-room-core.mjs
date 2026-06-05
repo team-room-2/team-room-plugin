@@ -87,6 +87,9 @@ export function parseTranscriptRow(row) {
   const out = [];
   const m = row && row.message;
   if (!m) return out;
+  // Skip meta injections (slash-command bodies, command output, etc.) — Claude Code flags these
+  // with isMeta:true. They render as user text but aren't real prompts, so they'd pollute the feed.
+  if (row.isMeta) return out;
   const c = m.content;
   if (row.type === 'user' && m.role === 'user') {
     let text = null;
