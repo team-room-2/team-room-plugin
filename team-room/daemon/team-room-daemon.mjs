@@ -6,7 +6,7 @@
 // streams activity to THAT session's room lane. On the CLI, where the plugin's hooks already
 // stream, it stands down per-session via the hook heartbeat — so the daemon and the hooks never
 // double-post. Pure Node, no deps; reuses the plugin's capture core.
-import { statSync, openSync, readSync, closeSync, fstatSync } from 'node:fs';
+import { statSync, openSync, readSync, closeSync, fstatSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -65,7 +65,25 @@ async function tick() {
   }
 }
 
-process.stderr.write(`[team-room-daemon] started — watching ${PROJECTS} (poll ${POLL_MS}ms)\n`);
-process.on('SIGTERM', () => process.exit(0));
-process.on('SIGINT', () => process.exit(0));
+// Single-instance guard: only ONE daemon may run. A kickstart race or a stray manual start could
+// otherwise leave two daemons tailing the same transcript and posting every activity TWICE.
+const LOCK = join(homedir(), '.team-room', 'daemon.pid');
+(function ensureSingleInstance() {
+  try {
+    const prev = parseInt(readFileSync(LOCK, 'utf8'), 10);
+    if (prev && prev !== process.pid) {
+      try {
+        process.kill(prev, 0); // throws if that pid is not alive
+        process.stderr.write(`[team-room-daemon] another instance (pid ${prev}) is live — exiting\n`);
+        process.exit(0);
+      } catch { /* stale pid → take over */ }
+    }
+  } catch { /* no lockfile yet → fine */ }
+  try { writeFileSync(LOCK, String(process.pid)); } catch { /* best-effort */ }
+})();
+const releaseLock = () => { try { unlinkSync(LOCK); } catch { /* */ } };
+
+process.stderr.write(`[team-room-daemon] started (pid ${process.pid}) — watching ${PROJECTS} (poll ${POLL_MS}ms)\n`);
+process.on('SIGTERM', () => { releaseLock(); process.exit(0); });
+process.on('SIGINT', () => { releaseLock(); process.exit(0); });
 for (;;) { await tick(); await new Promise((r) => setTimeout(r, POLL_MS)); }
