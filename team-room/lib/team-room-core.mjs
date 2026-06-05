@@ -7,7 +7,7 @@ import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 
-const MAX = 500; // summary cap — matches the server's activityIngestSchema (.max(500))
+export const MAX = 8000; // summary cap — matches the server's activityIngestSchema (.max(8000)); generous so agent messages stream in full
 
 // ── per-session connection marker, written by /connect ────────────────────────────────
 // Keyed by the Claude Code session id (CLAUDE_CODE_SESSION_ID, which is also the transcript

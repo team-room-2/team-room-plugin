@@ -4,7 +4,7 @@
 // (~/.team-room/sessions/<session_id>.json). We also touch the per-session heartbeat each event
 // so the desktop daemon knows this session's hooks are live and stands down. No marker → silent.
 import { readFileSync } from 'node:fs';
-import { readMarker, postActivity, mapHookEvent, lastAssistantText, touchHeartbeat } from '../lib/team-room-core.mjs';
+import { readMarker, postActivity, mapHookEvent, lastAssistantText, touchHeartbeat, MAX } from '../lib/team-room-core.mjs';
 
 function readStdin() {
   process.stdin.setEncoding('utf8');
@@ -16,7 +16,7 @@ function toActivity(event) {
     if (!event.transcript_path) return null;
     let text = null;
     try { text = lastAssistantText(readFileSync(event.transcript_path, 'utf8')); } catch { return null; }
-    return text ? { kind: 'agent_message', summary: text.slice(0, 500) } : null;
+    return text ? { kind: 'agent_message', summary: text.slice(0, MAX) } : null;
   }
   return mapHookEvent(event ?? {});
 }
