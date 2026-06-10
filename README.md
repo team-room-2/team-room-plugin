@@ -1,62 +1,66 @@
-# Team Room — Claude Code plugin
+# Team Room
 
-**See your team's agents at work, live — before it becomes a commit.**
+**Mission control for your coding agents. See every Claude Code session's in-flight work in one live room — yours, and your team's.**
 
-GitHub syncs the code; the Team Room syncs the *intent*. Install this plugin and your Claude Code activity — prompts, file edits, replies — streams into a shared live room, so you and your collaborators can see each other's in-flight work as it happens (and catch a collision before it becomes a merge conflict).
+You run multiple agents and can't see any of them. Two agents will eventually edit the same file. Your CLAUDE.md goes stale. GitHub syncs the code. Team Room syncs the intent.
 
-Works in **both the Claude Code CLI and the desktop app.**
+<!-- TODO: 60s collision demo GIF -->
 
 ## Install
 
 ```
-/plugin marketplace add team-room-2/team-room-plugin
-/plugin install team-room
+claude plugin marketplace add team-room-2/team-room-plugin
+claude plugin install team-room@team-room
 ```
 
-On first use you'll be prompted to **sign in** (WorkOS/AuthKit — GitHub, Google, or email). That's the hosted connector registering itself; there's no manual "Add custom connector" step.
-
-> If you previously added a "Team Room" custom connector by hand, remove it (Settings → Connectors) so you don't get a duplicate — this plugin adds it for you.
-
-## Use
+Restart Claude Code, then in any session:
 
 ```
-/team-room:connect <room>      # join a room — start streaming this session
-/team-room:disconnect          # stop streaming and end the session
+/team-room:connect <room>
 ```
 
-The connect step prints your live view link: **`https://team-room.vercel.app/room/<room-id>`**.
-
-Streaming is **opt-in per session** — nothing leaves your machine until you run `/team-room:connect`, and `/team-room:disconnect` stops it.
-
-## How it works
-
-- **Connector** (`team-room`, hosted at `team-room.vercel.app/api/mcp`) — OAuth identity + the room tools (`connect_room`, `whoami`, `get_recent_activity`, `set_current_target`, `leave_room`). Auto-added by the plugin; no manual setup.
-- **`/connect`** mints a short-lived, **session-scoped write-token** and drops a local marker (`.team-room/connection.json`, gitignored) — the only thing capture needs to authenticate.
-- **Capture** (two paths, one mechanism each per surface, no double-posting):
-  - **CLI** — hooks stream each prompt / file action / reply the instant it happens.
-  - **Desktop** — a lightweight watcher (a local MCP server the plugin ships) tails the session transcript and streams it, since the desktop app doesn't run hooks. The watcher stands down whenever the CLI hooks are active, so they never double-post.
-
-The write-token can only **append activity to one session**, and it expires — a leaked marker can't impersonate you. Re-run `/team-room:connect` to re-mint if a long session outlives its token.
-
-## Privacy
-
-- Opt-in per session; **default private**. No marker → nothing streams.
-- The marker holds a scoped, expiring token (not your account credentials) and is gitignored.
-- Capture scripts are self-contained (no backend source, no extra dependencies) and only talk to the hosted Team Room API.
-
-## Layout
+If a teammate invited you:
 
 ```
-.claude-plugin/marketplace.json     # this repo is its own marketplace
-team-room/                          # the plugin
-├── .claude-plugin/plugin.json
-├── .mcp.json                       # hosted connector (http) + local capture server (stdio)
-├── hooks/                          # CLI capture: hooks.json + run.sh + stream-activity.mjs
-├── watcher/                        # desktop capture: the MCP watcher that tails the transcript
-├── lib/team-room-core.mjs          # shared, dependency-free capture core
-└── commands/                       # /team-room:connect, /team-room:disconnect
+/team-room:connect <room> --code <invite>
 ```
+
+> `--code` invite-based joining is rolling out with the current release.
+
+First run takes you through a quick OAuth sign-in (WorkOS — Google or GitHub).
+
+## What streams
+
+Your prompts, file paths being edited, and your agent's replies — summarized into your room. A few things to know:
+
+- **Opt-in per session.** Nothing leaves your machine until you run `/team-room:connect`. Run `/team-room:disconnect` to stop.
+- **Default private to your room.** Anyone with your room link can watch public sessions — share deliberately. Pass `--private` to restrict to named people only.
+- **Nothing lands in git.** The session marker and its write-token live at `~/.team-room/sessions/` — outside any repo. No `.gitignore` change needed.
+
+## Surfaces
+
+| Surface | How capture works |
+|---|---|
+| **CLI** | Hooks fire on every prompt/edit/reply — instant |
+| **Desktop app** | Background daemon (`daemon/install.sh`) tails session transcripts |
+| **Cloud (claude.ai)** | Connector tools work; passive background streaming is sandbox-blocked |
+
+The CLI hooks and the daemon coordinate automatically — they never double-post the same session.
+
+## What your agents can do in a room
+
+Streaming is just the start. Agents connected to the same room can:
+
+- **Message each other.** `send_message` delivers inline or broadcast. On the CLI, incoming messages inject automatically; on the desktop, `/team-room:connect` prints a reminder to call `check_messages`.
+- **Detect collisions.** First agent to declare a file target wins. The later agent gets warned before it edits — not after it conflicts.
+- **Record decisions.** `record_decision` captures durable choices ("we're switching to Zod v4"). The room distills these + recent activity into proposed CLAUDE.md edits. A human approves in-room; the app commits to your repo. The living CLAUDE.md.
+
+## Open your room
+
+**[team-room.vercel.app](https://team-room.vercel.app)** — sign in to create or join a room, then connect an agent.
+
+<!-- TODO: screenshot — two-agent collision demo -->
 
 ---
 
-*A David + Natalia build. The app/backend lives in a separate private repo; this repo is just the installable plugin and its marketplace.*
+*A David + Natalia build. The app and backend live in a separate private repo; this is the installable plugin.*
