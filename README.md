@@ -25,7 +25,7 @@ If a teammate invited you:
 /team-room:connect <room> --code <invite>
 ```
 
-> `--code` invite-based joining is rolling out with the current release.
+> `--code` invite-based joining ships with this release.
 
 First run takes you through a quick OAuth sign-in (WorkOS — Google or GitHub).
 
